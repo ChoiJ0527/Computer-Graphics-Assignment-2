@@ -29,6 +29,13 @@ class Cube_Outline extends Shape {
         // When a set of lines is used in graphics, you should think of the list entries as
         // broken down into pairs; each pair of vertices will be drawn as a line segment.
         // Note: since the outline is rendered with Basic_shader, you need to redefine the position and color of each vertex
+
+        this.arrays.position = Vector3.cast(
+            [1, 1, 1], [-1, 1, 1], [1, -1, 1], [-1, -1, 1], [1, 1, -1], [-1, 1, -1], [1, -1, -1], [-1, -1, -1],
+            [1, 1, 1], [1, -1, 1], [-1, 1, 1], [-1, -1, 1], [1, 1, -1], [1, -1, -1], [-1, 1, -1], [-1, -1, -1],
+            [1, 1, 1], [1, 1, -1], [-1, 1, 1], [-1, 1, -1], [1, -1, 1], [1, -1, -1], [-1, -1, 1], [-1, -1, -1]);
+        this.arrays.color = Array(24).fill([1, 1, 1, 1])
+        this.indexed = false;
     }
 }
 
@@ -36,6 +43,31 @@ class Cube_Single_Strip extends Shape {
     constructor() {
         super("position", "normal");
         // TODO (Requirement 6)
+
+        let strip_vectors = Vector3.cast(
+            [-1,  1,  1], [1,  1,  1],
+            [-1,  1, -1], [1,  1, -1],
+            [-1, -1,  1], [1, -1,  1],
+            [-1, -1, -1], [1, -1, -1]);
+
+        this.arrays.position = strip_vectors
+        this.arrays.normal = strip_vectors
+        this.indices.push(
+            0, 1, 2,
+            0, 1, 4,
+            0, 2, 4,
+
+            3, 1, 2,
+            3, 1, 7,
+            3, 2, 7,
+
+            5, 1, 4,
+            5, 1, 7,
+            5, 4, 7,
+
+            6, 2, 4,
+            6, 2, 7,
+            6, 4, 7);
     }
 }
 
@@ -53,6 +85,7 @@ class Base_Scene extends Scene {
         this.shapes = {
             'cube': new Cube(),
             'outline': new Cube_Outline(),
+            'strip': new Cube_Single_Strip()
         };
 
         // *** Materials
@@ -90,10 +123,29 @@ export class Assignment2 extends Base_Scene {
      * This gives you a very small code sandbox for editing a simple scene, and for
      * experimenting with matrix transformations.
      */
+
+    constructor() {
+        super();
+
+        this.still = false;
+        this.outline = false;
+
+        this.t;
+        this.max_rotation = 0.05 * Math.PI;
+        this.color_arr = [];
+        for (let i = 0; i < 8; i++) {
+            this.color_arr[i] = color(Math.random(), Math.random(), Math.random(), 1.0);
+        }
+    }
+
     set_colors() {
         // TODO:  Create a class member variable to store your cube's colors.
         // Hint:  You might need to create a member variable at somewhere to store the colors, using `this`.
         // Hint2: You can consider add a constructor for class Assignment2, or add member variables in Base_Scene's constructor.
+
+        for (let i = 0; i < 8; i++) {
+            this.color_arr[i] = color(Math.random(), Math.random(), Math.random(), 1.0);
+        }
     }
 
     make_control_panel() {
@@ -102,17 +154,40 @@ export class Assignment2 extends Base_Scene {
         // Add a button for controlling the scene.
         this.key_triggered_button("Outline", ["o"], () => {
             // TODO:  Requirement 5b:  Set a flag here that will toggle your outline on and off
+
+            this.outline = !this.outline;
         });
         this.key_triggered_button("Sit still", ["m"], () => {
             // TODO:  Requirement 3d:  Set a flag here that will toggle your swaying motion on and off.
+
+            this.still = !this.still;
         });
     }
 
-    draw_box(context, program_state, model_transform) {
+    draw_box(context, program_state, model_transform, i) {
         // TODO:  Helper function for requirement 3 (see hint).
         //        This should make changes to the model_transform matrix, draw the next box, and return the newest model_transform.
         // Hint:  You can add more parameters for this function, like the desired color, index of the box, etc.
 
+        if (this.outline)
+            this.shapes.outline.draw(context, program_state, model_transform, this.white, "LINES");
+        else if (i % 2 == 0)
+            this.shapes.strip.draw(context, program_state, model_transform, this.materials.plastic.override({ color: this.color_arr[i] }), "TRIANGLE_STRIP");
+        else
+            this.shapes.cube.draw(context, program_state, model_transform, this.materials.plastic.override({ color: this.color_arr[i] }));
+
+        if (this.still)
+            var rotation = this.max_rotation;
+        else
+            var rotation = (this.max_rotation / 2) + ((this.max_rotation / 2) * Math.sin(Math.PI * this.t))
+
+        model_transform = model_transform
+            .times( Mat4.scale(1, 1/1.5, 1))
+            .times( Mat4.translation( -1, 1.5, 0 ))
+            .times( Mat4.rotation(rotation, 0, 0, 1))
+            .times( Mat4.translation(1, 1.5, 0 ))
+            .times( Mat4.scale(1, 1.5, 1));
+            
         return model_transform;
     }
 
@@ -122,7 +197,15 @@ export class Assignment2 extends Base_Scene {
         let model_transform = Mat4.identity();
 
         // Example for drawing a cube, you can remove this line if needed
-        this.shapes.cube.draw(context, program_state, model_transform, this.materials.plastic.override({color:blue}));
+        //this.shapes.cube.draw(context, program_state, model_transform, this.materials.plastic.override({color:blue}));
         // TODO:  Draw your entire scene here.  Use this.draw_box( graphics_state, model_transform ) to call your helper.
+
+        this.t = program_state.animation_time / 1000;
+
+        model_transform = model_transform.times(Mat4.scale(1, 1.5, 1));
+
+        for (let i = 0; i < 8; i++) {
+            model_transform = this.draw_box(context, program_state, model_transform, i);
+        }
     }
 }
